@@ -1,0 +1,241 @@
+<!DOCTYPE html> 
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Flip Clock (Scalable)</title>
+  <!-- Подключаем Anton из Google Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Anton&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Anton', sans-serif;
+      background: transparent;
+      /* Центрируем весь блок по горизонтали и вертикали */
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      min-height: 100vh; /* Чтобы всё было красиво по центру */
+    }
+
+    /*
+      Обёртка, которую мы будем растягивать (например, в Notion).
+      - width: 100%   => занимает всю доступную ширину родителя
+      - max-width: 600px (пример) => чтобы часы не росли бесконечно
+      - position: relative и height: автоуправление через JS
+    */
+    .scalable-wrapper {
+      width: 100%;
+      max-width: 600px; /* Можете увеличить или убрать, если хотите ещё больше */
+      position: relative;
+      /* Высота будет выставляться динамически скриптом */
+      height: auto;
+    }
+
+    /*
+      Ваш исходный контейнер с часами (НЕ меняем пропорции).
+      Единственное добавление: transform-origin, position:absolute,
+      чтобы масштабировать из левого верхнего угла.
+    */
+    .clock-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: top left;
+
+      /* ВАЖНО: ниже — ваш оригинальный код */
+      display: flex;
+      gap: 5px; /* Минимальный зазор между плашками */
+    }
+    .flip-card {
+      position: relative;
+      width: 150px;
+      height: 220px;
+      background-color: #640505; /* Бордовый */
+      color: #ffffff;
+      perspective: 1000px;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .flip-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transform-style: preserve-3d;
+      transition: transform 0.7s ease;
+    }
+    /* Лицевая/оборотная стороны (цифры) */
+    .flip-face {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* Немного уменьшаем размер, с 120px до 110px */
+      font-size: 110px;
+      line-height: 1;
+    }
+    .flip-front { }
+    .flip-back {
+      transform: rotateX(180deg);
+    }
+
+    /* Подписи даты и дня недели */
+    .date-label,
+    .weekday-label {
+      position: absolute;
+      font-size: 20px;
+      text-transform: uppercase;
+      opacity: 0.9;
+    }
+    .date-label {
+      bottom: 10px;
+      left: 10px;
+    }
+    .weekday-label {
+      bottom: 10px;
+      right: 10px;
+    }
+
+    /* Флип-анимация */
+    .flip-card.flip .flip-inner {
+      transform: rotateX(-180deg);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Новая обёртка, которая будет масштабироваться -->
+  <div class="scalable-wrapper" id="scalableWrapper">
+
+    <!-- Ваш исходный блок с часами (не меняем структуру и размеры!) -->
+    <div class="clock-container" id="clockContainer">
+      <!-- Левая карточка (ЧАСЫ) -->
+      <div class="flip-card" id="hour-card">
+        <div class="flip-inner" id="hour-inner">
+          <div class="flip-face flip-front" id="hour-front">00</div>
+          <div class="flip-face flip-back"  id="hour-back">00</div>
+        </div>
+        <div class="date-label" id="date-label">22 FEB</div>
+      </div>
+
+      <!-- Правая карточка (МИНУТЫ) -->
+      <div class="flip-card" id="minute-card">
+        <div class="flip-inner" id="minute-inner">
+          <div class="flip-face flip-front" id="minute-front">00</div>
+          <div class="flip-face flip-back"  id="minute-back">00</div>
+        </div>
+        <div class="weekday-label" id="weekday-label">WEDNESDAY</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------
+    // ВАШ КОД ОБНОВЛЕНИЯ ЧАСОВ
+    // ---------------------------
+    const hourCard    = document.getElementById('hour-card');
+    const hourInner   = document.getElementById('hour-inner');
+    const hourFront   = document.getElementById('hour-front');
+    const hourBack    = document.getElementById('hour-back');
+
+    const minuteCard  = document.getElementById('minute-card');
+    const minuteInner = document.getElementById('minute-inner');
+    const minuteFront = document.getElementById('minute-front');
+    const minuteBack  = document.getElementById('minute-back');
+
+    const dateLabel    = document.getElementById('date-label');
+    const weekdayLabel = document.getElementById('weekday-label');
+
+    const weekdays = ["SUNDAY","MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY"];
+    const months   = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+    let currentHour   = null;
+    let currentMinute = null;
+
+    function updateClock() {
+      const now = new Date();
+      const hour    = now.getHours();
+      const minute  = now.getMinutes();
+      const day     = now.getDate();
+      const month   = now.getMonth();
+      const weekday = now.getDay();
+
+      const hourStr   = hour   < 10 ? "0" + hour   : String(hour);
+      const minuteStr = minute < 10 ? "0" + minute : String(minute);
+
+      dateLabel.textContent    = `${day} ${months[month]}`;
+      weekdayLabel.textContent = weekdays[weekday];
+
+      if (hourStr !== currentHour) {
+        flipAnimation(hourCard, hourInner, hourFront, hourBack, currentHour, hourStr);
+        currentHour = hourStr;
+      }
+      if (minuteStr !== currentMinute) {
+        flipAnimation(minuteCard, minuteInner, minuteFront, minuteBack, currentMinute, minuteStr);
+        currentMinute = minuteStr;
+      }
+    }
+
+    function flipAnimation(card, inner, front, back, oldVal, newVal) {
+      if (oldVal === null) {
+        front.textContent = newVal;
+        back.textContent  = newVal;
+        return;
+      }
+      front.textContent = oldVal;
+      back.textContent  = newVal;
+
+      card.classList.add('flip');
+      setTimeout(() => {
+        front.textContent = newVal;
+        card.classList.remove('flip');
+      }, 700);
+    }
+
+    // ----------------------------
+    // ЛОГИКА МАСШТАБИРОВАНИЯ
+    // ----------------------------
+    function scaleClock() {
+      const wrapper = document.getElementById('scalableWrapper');
+      const clock   = document.getElementById('clockContainer');
+
+      // Ваша "база": 2 карточки по 150px + 5px зазор = 305px в ширину, 220px в высоту
+      const baseWidth  = 305;
+      const baseHeight = 220;
+
+      // Текущая доступная ширина wrapper
+      const wrapperWidth = wrapper.offsetWidth;
+
+      // Во сколько раз увеличиваем (или уменьшаем)
+      const scaleFactor = wrapperWidth / baseWidth;
+
+      // Применяем transform: scale(...) к clockContainer
+      clock.style.transform = `scale(${scaleFactor})`;
+
+      // Меняем высоту wrapper, чтобы он занимал (220 * scaleFactor) px
+      wrapper.style.height = (baseHeight * scaleFactor) + 'px';
+    }
+
+    // При загрузке и изменении размеров окна — пересчитываем масштаб
+    window.addEventListener('load', () => {
+      updateClock();
+      scaleClock();
+    });
+    window.addEventListener('resize', scaleClock);
+
+    // Обновляем время каждую секунду
+    setInterval(updateClock, 1000);
+  </script>
+</body>
+</html>
+
